@@ -7,11 +7,18 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "dev": "ts-node src/worker.ts",
-    "start": "node dist/worker.js"
+    "start": "node dist/worker.js",
+    "prisma:generate": "prisma generate"
   },
   "dependencies": {
     "@prisma/client": "^7.8.0",
     "axios": "^1.18.1",
     "dotenv": "^17.4.2"
+  },
+  "devDependencies": {
+    "@types/node": "^26.0.1",
+    "prisma": "^7.8.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^6.0.3"
   }
 }
