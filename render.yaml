@@ -1,5 +1,5 @@
 services:
-  - type: worker
+  - type: web
     name: pingpong-backend-worker
     runtime: node
     plan: free
