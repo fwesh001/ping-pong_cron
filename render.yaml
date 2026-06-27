@@ -1,0 +1,14 @@
+services:
+  - type: worker
+    name: pingpong-backend-worker
+    runtime: node
+    plan: free
+    buildCommand: npm install && npm run prisma:generate && npm run build
+    startCommand: node dist/worker.js
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: DIRECT_URL
+        sync: false
+      - key: NODE_ENV
+        value: production
