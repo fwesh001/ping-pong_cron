@@ -14,8 +14,17 @@ const prisma = new PrismaClient({ adapter });
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-const POLL_INTERVAL_MS = 1000;
 const DEFAULT_TIMEOUT_MS = 10000;
+const DEFAULT_POLL_INTERVAL_MS = 1000;
+
+const getPollIntervalMs = async (): Promise<number> => {
+  try {
+    const settings = await prisma.siteSettings.findFirst();
+    return settings?.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
+  } catch {
+    return DEFAULT_POLL_INTERVAL_MS;
+  }
+};
 
 interface PingResult {
   monitorId: string;
@@ -71,131 +80,132 @@ const startEngineTick = async (): Promise<void> => {
   console.log(`\n[${new Date(tickStart).toISOString()}] ── Engine Tick Started ──`);
 
   try {
-    const dueMonitors = await prisma.monitor.findMany({
-      where: {
-        status: "ACTIVE",
-        nextCheckAt: { lte: new Date() },
-      },
-      include: { user: true },
-    });
+    const settings = await prisma.siteSettings.findFirst();
 
-    console.log(`[Tick] Found ${dueMonitors.length} due monitors`);
-
-    if (dueMonitors.length === 0) {
-      setTimeout(() => void startEngineTick(), POLL_INTERVAL_MS);
-      return;
-    }
-
-    const zeroCreditMonitors = dueMonitors.filter((m) => m.user.creditBalance <= 0);
-    const validMonitors = dueMonitors.filter((m) => m.user.creditBalance > 0);
-
-    if (zeroCreditMonitors.length > 0) {
-      const zeroCreditUserIds = [...new Set(zeroCreditMonitors.map((m) => m.userId))];
-
-      await prisma.$transaction([
-        prisma.monitor.updateMany({
-          where: { id: { in: zeroCreditMonitors.map((m) => m.id) } },
-          data: { status: "PAUSED" },
-        }),
-        prisma.notification.createMany({
-          data: zeroCreditUserIds.map((userId) => ({
-            userId,
-            type: "SYSTEM",
-            message: "Your monitor(s) were paused due to insufficient credits. Please top up.",
-          })),
-        }),
-      ]);
-
-      console.log(
-        `[Credit Guard] Paused ${zeroCreditMonitors.length} monitors across ${zeroCreditUserIds.length} users (zero credits)`
-      );
-    }
-
-    if (validMonitors.length > 0) {
-      const results = await Promise.allSettled(validMonitors.map((monitor) => pingTarget(monitor)));
-
-      let successCount = 0;
-      let failCount = 0;
-      let logsSaved = 0;
-      let creditsSiphoned = 0;
-
-      const reconciliationPromises: Promise<void>[] = [];
-
-      results.forEach((result, index) => {
-        const monitor = validMonitors[index];
-
-        if (result.status === "fulfilled") {
-          const ping = result.value;
-          if (ping.isUp) successCount++;
-          else failCount++;
-
-          console.log(
-            `[Ping] Monitor [${ping.monitorId}] (${monitor.serviceName}) → ${ping.statusCode ?? "ERR"} in ${ping.latencyMs}ms ${ping.isUp ? "✓ UP" : "✗ DOWN"}`
-          );
-          if (ping.error) {
-            console.log(`       └─ Error: ${ping.error}`);
-          }
-
-          const nextCheckAt = new Date(Date.now() + (monitor.pingIntervalSecs ?? 60) * 1000);
-
-          const persistPromise = (async (): Promise<void> => {
-            try {
-              // A. Create heartbeat log
-              await prisma.pingLog.create({
-                data: {
-                  monitorId: monitor.id,
-                  userId: monitor.userId,
-                  status: ping.isUp ? "UP" : "DOWN",
-                  statusCode: ping.statusCode,
-                  responseTimeMs: ping.latencyMs,
-                  latencyMs: ping.latencyMs,
-                  isUp: ping.isUp,
-                  errorMessage: ping.error,
-                  checkedAt: new Date(),
-                },
-              });
-
-              // B. Advance monitor schedule
-              await prisma.monitor.update({
-                where: { id: monitor.id },
-                data: {
-                  lastPingedAt: new Date(),
-                  nextCheckAt,
-                },
-              });
-
-              // C. Credit siphon
-              await prisma.user.update({
-                where: { id: monitor.userId },
-                data: { creditBalance: { decrement: 1 } },
-              });
-
-              logsSaved++;
-              creditsSiphoned++;
-
-              console.log(
-                `       └─ Saved log, next check at ${nextCheckAt.toISOString()}, credit siphoned (-1)`
-              );
-            } catch (dbError) {
-              console.error(`       └─ DB write failed for monitor [${monitor.id}]:`, dbError);
-            }
-          })();
-
-          reconciliationPromises.push(persistPromise);
-        } else {
-          failCount++;
-          console.log(
-            `[Ping] Monitor [${monitor.id}] (${monitor.serviceName}) → FAILED: ${result.reason}`
-          );
-        }
+    if (settings?.globalPause) {
+      console.log(`[Tick] Engine paused by admin. Skipping cycle.`);
+    } else {
+      const dueMonitors = await prisma.monitor.findMany({
+        where: {
+          status: "ACTIVE",
+          nextCheckAt: { lte: new Date() },
+        },
+        include: { user: true },
       });
 
-      // Execute all persistence operations concurrently; individual failures are isolated
-      await Promise.allSettled(reconciliationPromises);
+      console.log(`[Tick] Found ${dueMonitors.length} due monitors`);
 
-      console.log(
-        `[Tick] Results: ${successCount} up, ${failCount} down | Logs saved: ${logsSaved} | Credits siphoned: ${creditsSiphoned}`
-      );
+      if (dueMonitors.length === 0) {
+        // nothing to do this tick
+      } else {
+        const zeroCreditMonitors = dueMonitors.filter((m) => m.user.creditBalance <= 0);
+        const validMonitors = dueMonitors.filter((m) => m.user.creditBalance > 0);
+
+        if (zeroCreditMonitors.length > 0) {
+          const zeroCreditUserIds = [...new Set(zeroCreditMonitors.map((m) => m.userId))];
+
+          await prisma.$transaction([
+            prisma.monitor.updateMany({
+              where: { id: { in: zeroCreditMonitors.map((m) => m.id) } },
+              data: { status: "PAUSED" },
+            }),
+            prisma.notification.createMany({
+              data: zeroCreditUserIds.map((userId) => ({
+                userId,
+                type: "SYSTEM",
+                message: "Your monitor(s) were paused due to insufficient credits. Please top up.",
+              })),
+            }),
+          ]);
+
+          console.log(
+            `[Credit Guard] Paused ${zeroCreditMonitors.length} monitors across ${zeroCreditUserIds.length} users (zero credits)`
+          );
+        }
+
+        if (validMonitors.length > 0) {
+          const results = await Promise.allSettled(validMonitors.map((monitor) => pingTarget(monitor)));
+
+          let successCount = 0;
+          let failCount = 0;
+          let logsSaved = 0;
+          let creditsSiphoned = 0;
+
+          const reconciliationPromises: Promise<void>[] = [];
+
+          results.forEach((result, index) => {
+            const monitor = validMonitors[index];
+
+            if (result.status === "fulfilled") {
+              const ping = result.value;
+              if (ping.isUp) successCount++;
+              else failCount++;
+
+              console.log(
+                `[Ping] Monitor [${ping.monitorId}] (${monitor.serviceName}) → ${ping.statusCode ?? "ERR"} in ${ping.latencyMs}ms ${ping.isUp ? "✓ UP" : "✗ DOWN"}`
+              );
+              if (ping.error) {
+                console.log(`       └─ Error: ${ping.error}`);
+              }
+
+              const nextCheckAt = new Date(Date.now() + (monitor.pingIntervalSecs ?? 60) * 1000);
+
+              const persistPromise = (async (): Promise<void> => {
+                try {
+                  await prisma.pingLog.create({
+                    data: {
+                      monitorId: monitor.id,
+                      userId: monitor.userId,
+                      status: ping.isUp ? "UP" : "DOWN",
+                      statusCode: ping.statusCode,
+                      responseTimeMs: ping.latencyMs,
+                      latencyMs: ping.latencyMs,
+                      isUp: ping.isUp,
+                      errorMessage: ping.error,
+                      checkedAt: new Date(),
+                    },
+                  });
+
+                  await prisma.monitor.update({
+                    where: { id: monitor.id },
+                    data: {
+                      lastPingedAt: new Date(),
+                      nextCheckAt,
+                    },
+                  });
+
+                  await prisma.user.update({
+                    where: { id: monitor.userId },
+                    data: { creditBalance: { decrement: 1 } },
+                  });
+
+                  logsSaved++;
+                  creditsSiphoned++;
+
+                  console.log(
+                    `       └─ Saved log, next check at ${nextCheckAt.toISOString()}, credit siphoned (-1)`
+                  );
+                } catch (dbError) {
+                  console.error(`       └─ DB write failed for monitor [${monitor.id}]:`, dbError);
+                }
+              })();
+
+              reconciliationPromises.push(persistPromise);
+            } else {
+              failCount++;
+              console.log(
+                `[Ping] Monitor [${monitor.id}] (${monitor.serviceName}) → FAILED: ${result.reason}`
+              );
+            }
+          });
+
+          await Promise.allSettled(reconciliationPromises);
+
+          console.log(
+            `[Tick] Results: ${successCount} up, ${failCount} down | Logs saved: ${logsSaved} | Credits siphoned: ${creditsSiphoned}`
+          );
+        }
+      }
     }
 
     const tickDuration = Date.now() - tickStart;
@@ -204,7 +214,8 @@ const startEngineTick = async (): Promise<void> => {
     console.error("[Tick] Fatal error during engine tick:", error);
   }
 
-  setTimeout(() => void startEngineTick(), POLL_INTERVAL_MS);
+  const pollInterval = await getPollIntervalMs();
+  setTimeout(() => void startEngineTick(), pollInterval);
 };
 
 app.get("/health", (_req, res) => {
@@ -224,7 +235,8 @@ const main = async (): Promise<void> => {
   console.log("║     Ping-Pong Background Worker v1.0            ║");
   console.log("║     Clockwork Engine Loop Initialized           ║");
   console.log("╚══════════════════════════════════════════════════╝");
-  console.log(`Polling interval: ${POLL_INTERVAL_MS}ms`);
+  const initialPollInterval = await getPollIntervalMs();
+  console.log(`Polling interval: ${initialPollInterval}ms (configurable in admin)`);
   console.log(`Default timeout:  ${DEFAULT_TIMEOUT_MS}ms`);
 
   startEngineTick();
