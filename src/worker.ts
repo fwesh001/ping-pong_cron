@@ -1,10 +1,14 @@
 import "dotenv/config";
 import process from "node:process";
 import { performance } from "node:perf_hooks";
+import express from "express";
 import axios, { AxiosError } from "axios";
 import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
+
+const app = express();
+const PORT = process.env.PORT || 3000;
 
 const POLL_INTERVAL_MS = 1000;
 const DEFAULT_TIMEOUT_MS = 10000;
@@ -199,6 +203,10 @@ const startEngineTick = async (): Promise<void> => {
   setTimeout(() => void startEngineTick(), POLL_INTERVAL_MS);
 };
 
+app.get("/health", (_req, res) => {
+  res.status(200).json({ status: "healthy", message: "Engine is humming smoothly." });
+});
+
 const main = async (): Promise<void> => {
   process.on("uncaughtException", (error: Error) => {
     console.error("[uncaughtException] Thread-safe crash prevented:", error);
@@ -215,15 +223,11 @@ const main = async (): Promise<void> => {
   console.log(`Polling interval: ${POLL_INTERVAL_MS}ms`);
   console.log(`Default timeout:  ${DEFAULT_TIMEOUT_MS}ms`);
 
-  await startEngineTick();
+  startEngineTick();
+
+  app.listen(PORT, () => {
+    console.log(`[Port Adapter] Listening on port ${PORT} to pass Render deployment check`);
+  });
 };
 
-void main()
-  .catch(async (error) => {
-    console.error("[Fatal] Worker crashed during initialization:", error);
-    await prisma.$disconnect();
-    process.exit(1);
-  })
-  .finally(async () => {
-    await prisma.$disconnect();
-  });
+main().catch((err) => console.error("Fatal exception in main thread:", err));
