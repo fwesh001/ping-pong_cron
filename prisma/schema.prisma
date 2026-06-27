@@ -1,0 +1,127 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["multiSchema"]
+}
+
+datasource db {
+  provider = "postgresql"
+  schemas  = ["pingpong"]
+}
+
+model User {
+  id            String             @id @default(cuid())
+  fluxUserId    String             @unique
+  email         String?
+  role          String             @default("USER")
+  creditBalance Float              @default(100.0)
+  monitorSlots  Int                @default(2)
+  streakCount   Int                @default(0)
+  lastClaimedAt DateTime?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  dailyCredits  DailyCreditClaim[]
+  monitors      Monitor[]
+  pingLogs      PingLog[]
+  notifications Notification[]
+  supportTickets SupportTicket[]
+
+  @@schema("pingpong")
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String   @default("SYSTEM")
+  message   String
+  isRead    Boolean  @default(false)
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@schema("pingpong")
+}
+
+model SupportTicket {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String
+  status    String   @default("NEW")
+  content   String
+  createdAt DateTime            @default(now())
+  updatedAt DateTime            @updatedAt
+  user      User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@schema("pingpong")
+}
+
+model SiteSettings {
+  id              String   @id @default(cuid())
+  creditCostPerPing Float   @default(0.01389)
+  globalPause     Boolean  @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@schema("pingpong")
+}
+
+model Monitor {
+  id               String    @id @default(cuid())
+  userId           String
+  serviceName      String
+  targetUrl        String
+  scheduleMode     String    @default("RECURRING")
+  pingIntervalSecs Int?
+  timeoutMs        Int       @default(10000)
+  maxRetries       Int       @default(0)
+  activeDays       String?
+  executeTime      String?
+  executeDate      DateTime?
+  isActive         Boolean   @default(true)
+  status           String    @default("ACTIVE")
+  isCompleted      Boolean   @default(false)
+  costPerPing      Float     @default(0.01389)
+  lastPingedAt     DateTime?
+  nextCheckAt      DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pingLogs         PingLog[]
+
+  @@index([userId])
+  @@schema("pingpong")
+}
+
+model PingLog {
+  id             String   @id @default(uuid())
+  monitorId      String
+  userId         String
+  status         String
+  responseTimeMs Int?
+  statusCode     Int?
+  errorMessage   String?
+  isUp           Boolean  @default(false)
+  latencyMs      Int?
+  checkedAt      DateTime @default(now())
+  createdAt      DateTime @default(now())
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  monitor        Monitor  @relation(fields: [monitorId], references: [id], onDelete: Cascade)
+
+  @@map("ping_logs")
+  @@index([monitorId])
+  @@index([userId])
+  @@schema("pingpong")
+}
+
+model DailyCreditClaim {
+  id        String   @id @default(cuid())
+  userId    String
+  claimedAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, claimedAt])
+  @@index([userId])
+  @@schema("pingpong")
+}
