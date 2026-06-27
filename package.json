@@ -1,0 +1,12 @@
+{
+  "name": "ping-pong-cron",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Dedicated worker for Ping-pong uptime checks and credit deduction",
+  "main": "dist/worker.js",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "dev": "ts-node src/worker.ts",
+    "start": "node dist/worker.js"
+  }
+}
