@@ -36,13 +36,17 @@ const RETRY_DELAY_MS = 2000;
 
 // ── Helpers ──
 
-const getPollIntervalMs = async (): Promise<number> => {
+const getGlobalSettings = async () => {
   try {
-    const settings = await prisma.siteSettings.findFirst();
-    return settings?.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
+    return await prisma.globalSettings.findFirst();
   } catch {
-    return DEFAULT_POLL_INTERVAL_MS;
+    return null;
   }
+};
+
+const getPollIntervalMs = async (): Promise<number> => {
+  const settings = await getGlobalSettings();
+  return settings?.pollIntervalMs ?? DEFAULT_POLL_INTERVAL_MS;
 };
 
 async function delay(ms: number): Promise<void> {
@@ -243,7 +247,7 @@ const startEngineTick = async (): Promise<void> => {
   console.log(`\n[${new Date(tickStart).toISOString()}] ── Engine Tick Started ──`);
 
   try {
-    const settings = await prisma.siteSettings.findFirst();
+    const settings = await getGlobalSettings();
 
     if (settings?.globalPause) {
       console.log(`[Tick] Engine paused by admin. Skipping cycle.`);
