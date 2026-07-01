@@ -4,6 +4,9 @@
   "private": true,
   "description": "Dedicated worker for Ping-pong uptime checks and credit deduction",
   "main": "dist/server.js",
+  "_moduleAliases": {
+    "@": "dist"
+  },
   "scripts": {
     "build": "prisma generate && tsc -p tsconfig.json",
     "dev": "ts-node src/server.ts",
@@ -15,10 +18,12 @@
     "axios": "1.6.0",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "module-alias": "^2.4.0",
     "pg": "^8.22.0"
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
+    "@types/module-alias": "^2.0.0",
     "@types/node": "^26.0.1",
     "@types/pg": "^8.20.0",
     "prisma": "^7.8.0",

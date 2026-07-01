@@ -1,3 +1,4 @@
+import "module-alias/register";
 import app from "./app.js";
 
 const port = process.env.EXPRESS_PORT ?? process.env.PORT ?? 9000;
