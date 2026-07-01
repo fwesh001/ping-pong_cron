@@ -303,11 +303,3 @@ const startEngineTick = async (): Promise<void> => {
 };
 
 startEngineTick().catch((err) => console.error("Fatal exception in cron engine:", err));
-
-async function getGlobalSettings() {
-  try {
-    return await prisma.globalSettings.findFirst();
-  } catch {
-    return null;
-  }
-}

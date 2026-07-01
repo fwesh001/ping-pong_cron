@@ -11,7 +11,7 @@
     "prisma:generate": "prisma generate"
   },
   "dependencies": {
-    "@prisma/client": "5.22.0",
+    "@prisma/client": "^7.8.0",
     "axios": "1.6.0",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
@@ -19,11 +19,11 @@
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
-    "@types/node": "^20.10.5",
+    "@types/node": "^26.0.1",
     "@types/pg": "^8.20.0",
-    "prisma": "5.22.0",
-    "ts-node": "^10.9.1",
-    "typescript": "5.3.3"
+    "prisma": "^7.8.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^6.0.3"
   }
 }
 
