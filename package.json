@@ -18,7 +18,7 @@
     "axios": "1.6.0",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
-    "module-alias": "^2.4.0",
+    "module-alias": "^2.3.4",
     "pg": "^8.22.0"
   },
   "devDependencies": {
