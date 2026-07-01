@@ -4,8 +4,10 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  schemas  = ["pingpong"]
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+  schemas   = ["pingpong"]
 }
 
 model User {
@@ -39,10 +41,9 @@ model Notification {
   targetAudience String   @default("ALL")
   readBy         String[]
   createdAt      DateTime @default(now())
-  user           User?    @relation(fields: [userId], references: [id])
+  User           User?    @relation(fields: [userId], references: [id])
   userId         String?
 
-  @@index([userId])
   @@schema("pingpong")
 }
 
@@ -76,66 +77,6 @@ model GlobalSettings {
   createdAt           DateTime  @default(now())
   updatedAt           DateTime  @updatedAt
 
-  @@schema("pingpong")
-}
-
-model Monitor {
-  id               String    @id @default(cuid())
-  userId           String
-  serviceName      String
-  targetUrl        String
-  scheduleMode     String    @default("RECURRING")
-  pingIntervalSecs Int?
-  timeoutMs        Int       @default(10000)
-  maxRetries       Int       @default(0)
-  activeDays       String?
-  executeTime      String?
-  executeDate      DateTime?
-  isActive         Boolean   @default(true)
-  status           String    @default("ACTIVE")
-  isCompleted      Boolean   @default(false)
-  costPerPing      Float     @default(0.01389)
-  lastPingedAt     DateTime?
-  nextCheckAt      DateTime?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
-  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  pingLogs         PingLog[]
-
-  @@index([userId])
-  @@schema("pingpong")
-}
-
-model PingLog {
-  id             String   @id @default(uuid())
-  monitorId      String
-  userId         String
-  status         String
-  responseTimeMs Int?
-  statusCode     Int?
-  errorMessage   String?
-  isUp           Boolean  @default(false)
-  latencyMs      Int?
-  checkedAt      DateTime @default(now())
-  createdAt      DateTime @default(now())
-  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  monitor        Monitor  @relation(fields: [monitorId], references: [id], onDelete: Cascade)
-
-  @@map("ping_logs")
-  @@index([monitorId])
-  @@index([userId])
-  @@schema("pingpong")
-}
-
-model DailyCreditClaim {
-  id        String   @id @default(cuid())
-  userId    String
-  claimedAt DateTime
-  createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, claimedAt])
-  @@index([userId])
   @@schema("pingpong")
 }
 
@@ -175,6 +116,63 @@ model AuditLog {
   timestamp DateTime @default(now())
 
   @@index([logType])
+  @@index([userId])
+  @@schema("pingpong")
+}
+
+model Monitor {
+  id               String    @id @default(cuid())
+  userId           String
+  serviceName      String
+  targetUrl        String
+  scheduleMode     String    @default("RECURRING")
+  pingIntervalSecs Int?
+  timeoutMs        Int       @default(10000)
+  maxRetries       Int       @default(0)
+  activeDays       String?
+  executeTime      String?
+  executeDate      DateTime?
+  isActive         Boolean   @default(true)
+  status           String    @default("ACTIVE")
+  isCompleted      Boolean   @default(false)
+  costPerPing      Float     @default(0.01389)
+  lastPingedAt     DateTime?
+  nextCheckAt      DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  pingLogs         PingLog[]
+
+  @@index([userId])
+  @@schema("pingpong")
+}
+
+model PingLog {
+  id             String   @id @default(cuid())
+  monitorId      String
+  userId         String
+  status         String
+  responseTimeMs Int?
+  statusCode     Int?
+  errorMessage   String?
+  checkedAt      DateTime
+  createdAt      DateTime @default(now())
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  monitor        Monitor  @relation(fields: [monitorId], references: [id], onDelete: Cascade)
+
+  @@index([monitorId])
+  @@index([userId])
+  @@schema("pingpong")
+}
+
+model DailyCreditClaim {
+  id        String   @id @default(cuid())
+  userId    String
+  claimedAt DateTime
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, claimedAt])
   @@index([userId])
   @@schema("pingpong")
 }
