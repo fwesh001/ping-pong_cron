@@ -29,8 +29,12 @@ export function createApp(): Express {
   
   // Health check endpoint for cron-job services
   app.get("/health", (_req, res) => {
-    const paymentsConfigured = Boolean(process.env.FLW_SECRET_KEY);
-    const webhookConfigured = Boolean(process.env.FLW_WEBHOOK_HASH);
+    const paymentsConfigured = Boolean(
+      process.env.FLW_SECRET_KEY ?? process.env.FLUTTERWAVE_SECRET ?? process.env.FLUTTERWAVE_SECRET_KEY ?? process.env.FLUTTERWAVE_SECR
+    );
+    const webhookConfigured = Boolean(
+      process.env.FLW_WEBHOOK_HASH ?? process.env.FLUTTERWAVE_WEBHOOK_HASH ?? process.env.FLW_WEBHOOK_HASH
+    );
     res.status(200).json({
       status: "ok",
       timestamp: new Date().toISOString(),

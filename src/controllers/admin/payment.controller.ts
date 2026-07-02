@@ -4,8 +4,10 @@ import axios from "axios";
 import prisma from "@/lib/db";
 import { logAdminAction } from "@/utils/audit";
 
-const FLW_SECRET_KEY = process.env.FLW_SECRET_KEY;
-const FLW_WEBHOOK_HASH = process.env.FLW_WEBHOOK_HASH;
+const FLW_SECRET_KEY =
+  process.env.FLW_SECRET_KEY ?? process.env.FLUTTERWAVE_SECRET ?? process.env.FLUTTERWAVE_SECRET_KEY ?? process.env.FLUTTERWAVE_SECR;
+const FLW_WEBHOOK_HASH =
+  process.env.FLW_WEBHOOK_HASH ?? process.env.FLUTTERWAVE_WEBHOOK_HASH ?? process.env.FLW_WEBHOOK_HASH;
 const FLW_API_BASE = "https://api.flutterwave.com/v3";
 
 export async function initializePayment(req: Request, res: Response) {
