@@ -3,7 +3,7 @@ services:
     name: pingpong-backend-worker
     runtime: node
     plan: free
-    buildCommand: npm install && npm run prisma:generate && npm run build
+    buildCommand: npm install --include=dev && npm run prisma:generate && npm run build
     startCommand: npm start
     envVars:
       - key: DATABASE_URL
