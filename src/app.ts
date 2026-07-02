@@ -29,7 +29,15 @@ export function createApp(): Express {
   
   // Health check endpoint for cron-job services
   app.get("/health", (_req, res) => {
-    res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
+    const paymentsConfigured = Boolean(process.env.FLW_SECRET_KEY);
+    const webhookConfigured = Boolean(process.env.FLW_WEBHOOK_HASH);
+    res.status(200).json({
+      status: "ok",
+      timestamp: new Date().toISOString(),
+      paymentsConfigured,
+      webhookConfigured,
+      env: process.env.NODE_ENV ?? null,
+    });
   });
   
   app.use("/api/v1/admin", adminRoutes);
